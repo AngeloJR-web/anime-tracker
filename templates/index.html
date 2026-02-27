@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⛩️ OtakuTracker Pro</title>
+    <style>
+        :root {
+            --bg-color: #0f0f13; --card-bg: #1c1c24; --primary: #8b5cf6; 
+            --primary-hover: #7c3aed; --accent: #10b981; --text-main: #f8fafc; --text-muted: #94a3b8;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif; background-color: var(--bg-color);
+            color: var(--text-main); margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center;
+        }
+        /* Navbar / Abas */
+        .navbar {
+            width: 100%; background-color: var(--card-bg); padding: 15px 0; display: flex; justify-content: center;
+            gap: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); margin-bottom: 40px;
+        }
+        .tab-btn {
+            background: none; border: none; color: var(--text-muted); font-size: 1.1rem; font-weight: bold;
+            cursor: pointer; padding: 10px 20px; border-bottom: 3px solid transparent; transition: 0.3s;
+        }
+        .tab-btn.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
+        .tab-btn:hover { color: var(--text-main); }
+        
+        /* Containers */
+        .container { width: 100%; max-width: 900px; padding: 0 20px; box-sizing: border-box; display: none; }
+        .container.active { display: block; animation: fadeIn 0.4s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* Aba de Busca */
+        .search-box { display: flex; gap: 10px; margin-bottom: 30px; }
+        input { flex: 1; padding: 15px; border: 2px solid #2d2d3a; border-radius: 10px; background: var(--card-bg); color: white; }
+        button.btn-primary { padding: 15px 25px; background: var(--primary); color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; }
+        
+        .anime-card { background: var(--card-bg); border-radius: 15px; overflow: hidden; display: flex; box-shadow: 0 10px 20px rgba(0,0,0,0.4); }
+        .anime-poster { width: 200px; object-fit: cover; }
+        .anime-info { padding: 25px; flex: 1; display: flex; flex-direction: column; }
+        .anime-title { margin: 0 0 15px 0; font-size: 1.8rem; }
+        .synopsis { color: var(--text-muted); font-size: 0.9rem; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 4; line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 20px; }
+        
+        /* Grid da Biblioteca */
+        .library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+        .lib-card { background: var(--card-bg); border-radius: 10px; overflow: hidden; text-align: center; padding-bottom: 15px; position: relative; }
+        .lib-poster { width: 100%; height: 350px; object-fit: cover; }
+        .lib-title { font-weight: bold; margin: 10px; font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .lib-status { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.8); padding: 5px 10px; border-radius: 5px; font-size: 0.8rem; color: var(--accent); font-weight: bold; }
+        .lib-progress { margin-bottom: 10px; color: var(--text-muted); }
+        .btn-add { background: var(--accent); padding: 10px; border: none; border-radius: 5px; color: white; cursor: pointer; font-weight: bold; width: 90%; }
+        
+        .loading { display: none; text-align: center; margin: 20px; color: var(--primary); font-weight: bold;}
+    </style>
+</head>
+<body>
+
+    <div class="navbar">
+        <button class="tab-btn active" onclick="switchTab('search')">🔍 Buscar Animes</button>
+        <button class="tab-btn" onclick="switchTab('library')">📚 Minha Biblioteca</button>
+    </div>
+
+    <div id="tab-search" class="container active">
+        <div class="search-box">
+            <input type="text" id="animeInput" placeholder="Digite o nome do anime...">
+            <button class="btn-primary" onclick="searchAnime()">Buscar</button>
+        </div>
+        <div id="loadingSearch" class="loading">Buscando... ⏳</div>
+        
+        <div id="resultCard" class="anime-card" style="display: none;">
+            <img id="animePoster" src="" class="anime-poster">
+            <div class="anime-info">
+                <h2 id="animeTitle" class="anime-title"></h2>
+                <p id="animeSynopsis" class="synopsis"></p>
+                <p style="color: var(--text-muted)"><strong>Episódios:</strong> <span id="animeEpisodes"></span></p>
+                <button class="btn-primary" style="margin-top: auto; background: var(--accent);" onclick="addToLibrary()">+ Adicionar à Biblioteca</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-library" class="container">
+        <h2>Sua Coleção</h2>
+        <div id="loadingLibrary" class="loading">Carregando coleção... ⏳</div>
+        <div id="libraryGrid" class="library-grid">
+            </div>
+    </div>
+
+    <script>
+        let currentSearchedAnime = null;
+
+        // Alterna entre as abas
+        function switchTab(tabName) {
+            document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            
+            document.getElementById('tab-' + tabName).classList.add('active');
+            event.currentTarget.classList.add('active');
+
+            if(tabName === 'library') loadLibrary();
+        }
+
+        // Busca o anime na API do Jikan
+        async function searchAnime() {
+            const query = document.getElementById('animeInput').value;
+            if (!query) return;
+
+            document.getElementById('resultCard').style.display = 'none';
+            document.getElementById('loadingSearch').style.display = 'block';
+
+            try {
+                const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                document.getElementById('loadingSearch').style.display = 'none';
+
+                if (response.ok) {
+                    currentSearchedAnime = data;
+                    document.getElementById('animePoster').src = data.image_url || 'https://via.placeholder.com/200x300';
+                    document.getElementById('animeTitle').innerText = data.title;
+                    document.getElementById('animeSynopsis').innerText = data.synopsis;
+                    document.getElementById('animeEpisodes').innerText = data.total_episodes || '?';
+                    document.getElementById('resultCard').style.display = 'flex';
+                } else {
+                    alert(data.detail);
+                }
+            } catch (e) {
+                alert("Erro ao buscar.");
+            }
+        }
+
+        // Salva o anime no Banco de Dados SQLite
+        async function addToLibrary() {
+            if (!currentSearchedAnime) return;
+            try {
+                const response = await fetch('/api/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentSearchedAnime)
+                });
+                const result = await response.json();
+                alert(result.message);
+                switchTab('library'); // Vai direto para a biblioteca após salvar
+            } catch (e) {
+                alert("Erro ao salvar no banco de dados.");
+            }
+        }
+
+        // Carrega todos os animes do Banco de Dados
+        async function loadLibrary() {
+            document.getElementById('libraryGrid').innerHTML = '';
+            document.getElementById('loadingLibrary').style.display = 'block';
+
+            try {
+                const response = await fetch('/api/library');
+                const animes = await response.json();
+                document.getElementById('loadingLibrary').style.display = 'none';
+
+                const grid = document.getElementById('libraryGrid');
+                if(animes.length === 0) {
+                    grid.innerHTML = '<p style="color: var(--text-muted); grid-column: 1/-1; text-align: center;">Sua biblioteca está vazia. Busque um anime primeiro!</p>';
+                    return;
+                }
+
+                animes.forEach(anime => {
+                    const statusColor = anime.status === 'COMPLETED' ? '#10b981' : (anime.status === 'WATCHING' ? '#3b82f6' : '#94a3b8');
+                    const card = document.createElement('div');
+                    card.className = 'lib-card';
+                    card.innerHTML = `
+                        <div class="lib-status" style="color: ${statusColor}">${anime.status.replace(/_/g, ' ')}</div>
+                        <img src="${anime.image_url}" class="lib-poster">
+                        <div class="lib-title">${anime.title}</div>
+                        <div class="lib-progress">Progresso: <span id="prog-${anime.mal_id}">${anime.progress}</span> / ${anime.total_episodes || '?'}</div>
+                        <button class="btn-add" onclick="watchEpisode(${anime.mal_id})">+ Assistir 1 Ep</button>
+                    `;
+                    grid.appendChild(card);
+                });
+            } catch (e) {
+                document.getElementById('loadingLibrary').innerText = "Erro ao carregar banco de dados.";
+            }
+        }
+
+        // Atualiza o banco de dados quando clica em assistir
+        async function watchEpisode(mal_id) {
+            try {
+                const response = await fetch(`/api/watch/${mal_id}`, { method: 'POST' });
+                const data = await response.json();
+                
+                if(response.ok) {
+                    // Recarrega a biblioteca para atualizar status e cores
+                    loadLibrary(); 
+                } else {
+                    alert(data.detail);
+                }
+            } catch(e) {
+                alert("Erro ao atualizar.");
+            }
+        }
+    </script>
+</body>
+</html>

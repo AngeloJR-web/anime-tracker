@@ -1,0 +1,11 @@
+# Ambientes virtuais
+venv/
+env/
+
+# Arquivos de cache do Python
+__pycache__/
+*.pyc
+
+# Banco de dados local (não queremos subir nossos dados pessoais)
+*.db
+otakutracker.db
