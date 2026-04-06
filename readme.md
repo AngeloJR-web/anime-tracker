@@ -8,7 +8,6 @@
 
 Anime Tracker é uma aplicação Full-Stack de gerenciamento de animes construída com foco em **Clean Architecture** e **Domain-Driven Design (DDD)** simplificado. 
 
-O projeto demonstra a aplicação prática de padrões de engenharia de software, separando regras de negócio da camada de infraestrutura, além de utilizar chamadas assíncronas de alta performance e persistência de dados relacional.
 
 ---
 
